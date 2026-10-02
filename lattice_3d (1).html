@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Lattice Explorer</title>
+<style>
+  :root { --bg:#0e1220; --panel:rgba(20,26,46,.9); --line:#2c3556; --text:#e6e9f5; --muted:#8f98b8;
+    --join:#ffc857; --meet:#5be3a8; --sel:#ff6b8b; --bad:#ff8a5b; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:"Segoe UI", system-ui, -apple-system, sans-serif; overflow:hidden; }
+  canvas { display:block; touch-action:none; cursor:grab; }
+  canvas.dragging { cursor:grabbing; }
+  #panel { position:fixed; top:14px; left:14px; width:330px; max-width:calc(100% - 28px);
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px;
+    backdrop-filter:blur(6px); max-height:calc(100% - 28px); overflow-y:auto; }
+  h1 { font-size:17px; margin:0 0 6px; font-weight:600; }
+  p { font-size:13px; line-height:1.5; color:var(--muted); margin:6px 0; }
+  select, button { width:100%; background:#1b2240; color:var(--text); border:1px solid var(--line);
+    border-radius:6px; padding:8px 10px; font-size:13px; margin-top:8px; font-family:inherit; }
+  button { cursor:pointer; }
+  button:hover { border-color:#55629a; }
+  select:focus-visible, button:focus-visible { outline:2px solid #8fa2ff; outline-offset:1px; }
+  .row { display:flex; gap:8px; }
+  #props { margin-top:10px; font-size:13px; line-height:1.6; }
+  #result { margin-top:10px; padding:10px; border:1px solid var(--line); border-radius:8px;
+    font-size:13px; line-height:1.6; min-height:70px; }
+  .j { color:var(--join); font-weight:600; } .m { color:var(--meet); font-weight:600; }
+  .s { color:var(--sel); font-weight:600; } .bad { color:var(--bad); font-weight:600; }
+  .ok { color:var(--meet); font-weight:600; }
+  .legend { font-size:12px; color:var(--muted); margin-top:8px; line-height:1.7; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>Lattice explorer</h1>
+  <p>A lattice is a partial order where every two elements have a join (least upper bound, ∨) and a meet (greatest lower bound, ∧). Lines are the Hasse diagram: going up a line means going up in the order.</p>
+  <select id="preset" aria-label="Choose an example"></select>
+  <div class="row">
+    <button id="spin">Pause rotation</button>
+    <button id="reset">Clear selection</button>
+  </div>
+  <div id="props"></div>
+  <div id="result"></div>
+  <div class="legend">
+    <div><span class="dot" style="background:var(--sel)"></span>selected</div>
+    <div><span class="dot" style="background:var(--join)"></span>join / minimal upper bounds</div>
+    <div><span class="dot" style="background:var(--meet)"></span>meet / maximal lower bounds</div>
+    <div>Drag to rotate · scroll to zoom · click two nodes</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ================= Example definitions =================
+   Each example is a spec: { name, group, note, joinName, meetName, labels[], covers[[i,j],...], pos? }
+   covers = Hasse edges (i is covered by j). The order is the reflexive-transitive closure. */
+
+function productSpec(name, group, note, kind, max, names, jn, mn) {
+  const k = max.length, elems = [];
+  (function rec(i, cur) {
+    if (i === k) { elems.push(cur.slice()); return; }
+    for (let v = 0; v <= max[i]; v++) { cur.push(v); rec(i + 1, cur); cur.pop(); }
+  })(0, []);
+  const axes = max.map((_, i) => {
+    const th = (2 * Math.PI * i) / k + Math.PI / 6;
+    return new THREE.Vector3(Math.cos(th) * 1.5, 1.35, Math.sin(th) * 1.5);
+  });
+  if (k === 2) { axes[0].set(1.5, 1.35, 0.4); axes[1].set(-1.5, 1.35, 0.4); }
+  const idx = new Map(elems.map((e, i) => [e.join(","), i]));
+  const labels = elems.map(e => {
+    if (kind === "div") return String(e.reduce((a, x, i) => a * Math.pow(names[i], x), 1));
+    return "{" + names.filter((_, i) => e[i] > 0).join(",") + "}";
+  });
+  const covers = [];
+  elems.forEach((e, i) => e.forEach((x, d) => {
+    if (x < max[d]) { const u = e.slice(); u[d]++; covers.push([i, idx.get(u.join(","))]); }
+  }));
+  const pos = elems.map(e => {
+    const p = new THREE.Vector3(); e.forEach((x, d) => p.addScaledVector(axes[d], x)); return [p.x, p.y, p.z];
+  });
+  return { name, group, note, joinName: jn, meetName: mn, labels, covers, pos };
+}
+
+function manual(name, group, note, labels, coverNames, jn, mn, pos) {
+  const ix = Object.fromEntries(labels.map((l, i) => [l, i]));
+  return { name, group, note, joinName: jn, meetName: mn, labels,
+           covers: coverNames.map(([a, b]) => [ix[a], ix[b]]), pos };
+}
+
+// Partition lattice of {1,2,3,4}: finer < coarser
+function partitionLattice() {
+  const parts = [];
+  (function rec(i, blocks) {
+    if (i > 4) { parts.push(blocks.map(b => b.slice())); return; }
+    for (let b = 0; b < blocks.length; b++) { blocks[b].push(i); rec(i + 1, blocks); blocks[b].pop(); }
+    blocks.push([i]); rec(i + 1, blocks); blocks.pop();
+  })(1, []);
+  const key = p => p.map(b => b.join("")).sort().join("|");
+  const labels = parts.map(key);
+  const idx = new Map(labels.map((l, i) => [l, i]));
+  const covers = [];
+  parts.forEach((p, i) => {
+    for (let a = 0; a < p.length; a++) for (let b = a + 1; b < p.length; b++) {
+      const q = p.filter((_, t) => t !== a && t !== b).concat([p[a].concat(p[b])]);
+      covers.push([i, idx.get(key(q))]);
+    }
+  });
+  return { name: "Partitions of {1,2,3,4} (refinement order)", group: "Non-distributive lattices",
+    note: "Π₄: finer partitions are lower. Contains M₃ as a sublattice, so it is not distributive.",
+    joinName: "finest common coarsening", meetName: "coarsest common refinement", labels, covers, pos: null };
+}
+
+const SPECS = {
+  d30: productSpec("Divisors of 30", "Distributive (products of chains)",
+    "Order: divisibility. Join = lcm, meet = gcd. This is the Boolean lattice B₃, a cube.",
+    "div", [1,1,1], [2,3,5], "lcm", "gcd"),
+  pow: productSpec("Power set of {a,b,c}", "Distributive (products of chains)",
+    "Order: ⊆. Join = union, meet = intersection. Isomorphic to the divisors of 30 (a↔2, b↔3, c↔5).",
+    "set", [1,1,1], ["a","b","c"], "union", "intersection"),
+  d60: productSpec("Divisors of 60", "Distributive (products of chains)",
+    "Order: divisibility. A product of chains 3 × 2 × 2.", "div", [2,1,1], [2,3,5], "lcm", "gcd"),
+  d36: productSpec("Divisors of 36", "Distributive (products of chains)",
+    "Order: divisibility. A 3 × 3 grid.", "div", [2,2], [2,3], "lcm", "gcd"),
+  d210: productSpec("Divisors of 210", "Distributive (products of chains)",
+    "Boolean lattice B₄ (4-cube) projected into 3D.", "div", [1,1,1,1], [2,3,5,7], "lcm", "gcd"),
+
+  chain: manual("Chain with 5 elements", "Other lattices",
+    "A total order: join is the larger, meet is the smaller. Every two elements are comparable.",
+    ["1","2","3","4","5"], [["1","2"],["2","3"],["3","4"],["4","5"]], "max", "min",
+    [[0,0,0],[0,1.6,0],[0,3.2,0],[0,4.8,0],[0,6.4,0]]),
+  m3: manual("Diamond M₃", "Non-distributive lattices",
+    "Three incomparable atoms a, b, c. Any two have join 1 and meet 0, so a ∧ (b ∨ c) = a but (a ∧ b) ∨ (a ∧ c) = 0.",
+    ["0","a","b","c","1"], [["0","a"],["0","b"],["0","c"],["a","1"],["b","1"],["c","1"]], "join", "meet", null),
+  n5: manual("Pentagon N₅", "Non-distributive lattices",
+    "Here a < b and c is incomparable to both. It is not modular: a ∨ (c ∧ b) = a, but (a ∨ c) ∧ b = b.",
+    ["0","a","b","c","1"], [["0","a"],["a","b"],["b","1"],["0","c"],["c","1"]], "join", "meet",
+    [[0,0,0],[-1.3,1.7,0],[-1.3,3.4,0],[1.4,2.5,0],[0,4.3,0]]),
+  s3: manual("Subgroups of S₃", "Non-distributive lattices",
+    "Order: ⊆ between subgroups. Join = subgroup generated by both, meet = intersection. {e}, the three order-2 subgroups and S₃ form an M₃.",
+    ["{e}","⟨s1⟩","⟨s2⟩","⟨s3⟩","A₃","S₃"],
+    [["{e}","⟨s1⟩"],["{e}","⟨s2⟩"],["{e}","⟨s3⟩"],["{e}","A₃"],
+     ["⟨s1⟩","S₃"],["⟨s2⟩","S₃"],["⟨s3⟩","S₃"],["A₃","S₃"]], "generated subgroup", "intersection", null),
+  pi4: partitionLattice(),
+
+  bow: manual("Bowtie poset (not a lattice)", "Not a lattice",
+    "Both a and b lie below both c and d. a and b have two minimal upper bounds, c and d, and neither is least, so a ∨ b does not exist.",
+    ["0","a","b","c","d","1"],
+    [["0","a"],["0","b"],["a","c"],["a","d"],["b","c"],["b","d"],["c","1"],["d","1"]], "join", "meet", null)
+};
+
+/* ================= Order analysis ================= */
+function analyze(spec) {
+  const n = spec.labels.length;
+  const le = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => i === j));
+  spec.covers.forEach(([a, b]) => { le[a][b] = true; });
+  for (let k = 0; k < n; k++) for (let i = 0; i < n; i++) if (le[i][k]) for (let j = 0; j < n; j++) if (le[k][j]) le[i][j] = true;
+
+  const least = s => s.find(u => s.every(v => le[u][v]));
+  const greatest = s => s.find(u => s.every(v => le[v][u]));
+  const minimal = s => s.filter(u => !s.some(v => v !== u && le[v][u]));
+  const maximal = s => s.filter(u => !s.some(v => v !== u && le[u][v]));
+  const all = [...Array(n).keys()];
+
+  function bounds(i, j) {
+    const up = all.filter(u => le[i][u] && le[j][u]);
+    const lo = all.filter(u => le[u][i] && le[u][j]);
+    const J = least(up), M = greatest(lo);
+    return { up, lo, J: J === undefined ? -1 : J, M: M === undefined ? -1 : M };
+  }
+  const JT = [], MT = [];
+  let isLattice = true;
+  for (let i = 0; i < n; i++) { JT[i] = []; MT[i] = [];
+    for (let j = 0; j < n; j++) { const b = bounds(i, j); JT[i][j] = b.J; MT[i][j] = b.M; if (b.J < 0 || b.M < 0) isLattice = false; } }
+  let distributive = null;
+  if (isLattice) {
+    distributive = true;
+    outer: for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) for (let c = 0; c < n; c++)
+      if (MT[a][JT[b][c]] !== JT[MT[a][b]][MT[a][c]]) { distributive = false; break outer; }
+  }
+  // rank = longest chain from the bottom, used for layout
+  const rank = Array(n).fill(0);
+  for (let pass = 0; pass < n; pass++) spec.covers.forEach(([a, b]) => { rank[b] = Math.max(rank[b], rank[a] + 1); });
+  return { n, le, bounds, minimal, maximal, isLattice, distributive, rank };
+}
+
+/* ================= Three.js scene ================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x0e1220);
+document.body.appendChild(renderer.domElement);
+const canvas = renderer.domElement;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
+let camDist = 13;
+camera.position.set(0, 0, camDist);
+scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
+keyLight.position.set(5, 8, 6);
+scene.add(keyLight);
+const world = new THREE.Group();
+world.rotation.set(0.35, 0.6, 0);
+scene.add(world);
+
+let G = null, selected = [], overlay = [];
+
+function makeLabel(text) {
+  const c = document.createElement("canvas");
+  c.width = 320; c.height = 96;
+  const g = c.getContext("2d");
+  let size = 44;
+  g.font = `600 ${size}px "Segoe UI", sans-serif`;
+  while (g.measureText(text).width > 300 && size > 18) { size -= 2; g.font = `600 ${size}px "Segoe UI", sans-serif`; }
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.lineWidth = 8; g.strokeStyle = "#0e1220"; g.strokeText(text, 160, 48);
+  g.fillStyle = "#e6e9f5"; g.fillText(text, 160, 48);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+  sp.scale.set(1.75, 0.525, 1); sp.renderOrder = 10;
+  return sp;
+}
+
+function clearWorld() {
+  while (world.children.length) {
+    const o = world.children.pop();
+    o.traverse(n => { if (n.geometry) n.geometry.dispose();
+      if (n.material) { if (n.material.map) n.material.map.dispose(); n.material.dispose(); } });
+  }
+  overlay = [];
+}
+
+function autoLayout(spec, rank) {
+  const layers = {};
+  spec.labels.forEach((l, i) => (layers[rank[i]] = layers[rank[i]] || []).push(i));
+  const pos = [];
+  Object.keys(layers).forEach(r => {
+    const ids = layers[r].sort((a, b) => spec.labels[a].localeCompare(spec.labels[b]));
+    const rad = ids.length === 1 ? 0 : 0.35 * ids.length + 0.7;
+    ids.forEach((id, t) => {
+      const th = (2 * Math.PI * t) / ids.length + r * 0.5;
+      pos[id] = [Math.cos(th) * rad, r * 1.8, Math.sin(th) * rad];
+    });
+  });
+  return pos;
+}
+
+function build(key) {
+  const spec = SPECS[key];
+  clearWorld(); selected = [];
+  const A = analyze(spec);
+  const rawPos = spec.pos || autoLayout(spec, A.rank);
+  const pts = rawPos.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+  const box = new THREE.Box3().setFromPoints(pts);
+  const ctr = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+  pts.forEach(p => p.sub(ctr));
+  camDist = Math.max(10, Math.max(size.x, size.y, size.z) * 2.5);
+
+  const verts = [];
+  spec.covers.forEach(([a, b]) => verts.push(pts[a].x, pts[a].y, pts[a].z, pts[b].x, pts[b].y, pts[b].z));
+  const eg = new THREE.BufferGeometry();
+  eg.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  world.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x5a6aa8 })));
+
+  const maxRank = Math.max(...A.rank, 1);
+  const nodes = spec.labels.map((label, i) => {
+    const col = new THREE.Color().setHSL(0.62 - 0.62 * (A.rank[i] / maxRank), 0.65, 0.58);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.26, 24, 18),
+      new THREE.MeshStandardMaterial({ color: col, roughness: 0.4, metalness: 0.15 }));
+    mesh.position.copy(pts[i]); mesh.userData.idx = i;
+    world.add(mesh);
+    const lab = makeLabel(label);
+    lab.position.copy(pts[i]).add(new THREE.Vector3(0, 0.58, 0));
+    world.add(lab);
+    return { label, pos: pts[i], mesh, baseColor: col };
+  });
+
+  G = { spec, A, nodes };
+  const p = document.getElementById("props");
+  const lat = A.isLattice ? `<span class="ok">Lattice</span>` : `<span class="bad">Not a lattice</span>`;
+  const dist = A.isLattice ? ` · ${A.distributive ? '<span class="ok">distributive</span>' : '<span class="bad">not distributive</span>'}` : "";
+  p.innerHTML = `${lat}${dist} · ${A.n} elements`;
+  showIntro();
+}
+
+function showIntro() {
+  document.getElementById("result").innerHTML =
+    `${G.spec.note}<br><span style="color:var(--muted)">Click two nodes to find their join and meet.</span>`;
+}
+
+/* ================= Selection ================= */
+function paint(i, color, s) { const m = G.nodes[i].mesh; m.material.color.set(color); m.material.emissive.set(color).multiplyScalar(0.35); m.scale.setScalar(s); }
+function resetColors() {
+  G.nodes.forEach(n => { n.mesh.material.color.copy(n.baseColor); n.mesh.material.emissive.set(0); n.mesh.scale.setScalar(1); });
+  overlay.forEach(l => { world.remove(l); l.geometry.dispose(); l.material.dispose(); }); overlay = [];
+}
+function link(a, b, color) {
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([G.nodes[a].pos, G.nodes[b].pos]),
+    new THREE.LineDashedMaterial({ color, dashSize: 0.18, gapSize: 0.1 }));
+  l.computeLineDistances(); world.add(l); overlay.push(l);
+}
+const L = i => G.nodes[i].label;
+const names = arr => arr.map(L).join(", ");
+
+function updateSelection() {
+  resetColors();
+  const res = document.getElementById("result"), { spec, A } = G;
+  if (!selected.length) return showIntro();
+  const [i, j] = selected;
+  paint(i, 0xff6b8b, 1.35);
+  if (selected.length === 1) { res.innerHTML = `Selected <span class="s">${L(i)}</span>. Pick a second element.`; return; }
+  paint(j, 0xff6b8b, 1.35);
+  const b = A.bounds(i, j);
+  const rel = A.le[i][j] ? `<span class="s">${L(i)}</span> ≤ <span class="s">${L(j)}</span> (comparable)`
+            : A.le[j][i] ? `<span class="s">${L(j)}</span> ≤ <span class="s">${L(i)}</span> (comparable)`
+            : `<span class="s">${L(i)}</span> and <span class="s">${L(j)}</span> are incomparable`;
+  let html = rel + "<br>";
+  const ups = b.J >= 0 ? [b.J] : A.minimal(b.up);
+  const los = b.M >= 0 ? [b.M] : A.maximal(b.lo);
+  ups.forEach(u => { if (u !== i && u !== j) paint(u, 0xffc857, 1.35); link(i, u, 0xffc857); link(j, u, 0xffc857); });
+  los.forEach(u => { if (u !== i && u !== j) paint(u, 0x5be3a8, 1.35); link(i, u, 0x5be3a8); link(j, u, 0x5be3a8); });
+  html += b.J >= 0
+    ? `<span class="j">${L(i)} ∨ ${L(j)} = ${L(b.J)}</span> (${spec.joinName})<br>`
+    : `<span class="bad">No join.</span> Upper bounds: ${names(b.up) || "none"}. Minimal ones (${names(ups) || "none"}) have no least element.<br>`;
+  html += b.M >= 0
+    ? `<span class="m">${L(i)} ∧ ${L(j)} = ${L(b.M)}</span> (${spec.meetName})`
+    : `<span class="bad">No meet.</span> Lower bounds: ${names(b.lo) || "none"}. Maximal ones (${names(los) || "none"}) have no greatest element.`;
+  res.innerHTML = html;
+}
+
+/* ================= Interaction ================= */
+let dragging = false, moved = 0, lastX = 0, lastY = 0, autoSpin = true;
+const pointers = new Map(); let pinchStart = 0, camStart = 0;
+canvas.addEventListener("pointerdown", e => {
+  canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchStart = Math.hypot(a.x - b.x, a.y - b.y); camStart = camDist; }
+  dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY; canvas.classList.add("dragging");
+});
+canvas.addEventListener("pointermove", e => {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()];
+    camDist = Math.min(40, Math.max(5, camStart * pinchStart / Math.hypot(a.x - b.x, a.y - b.y))); return; }
+  const dx = e.clientX - lastX, dy = e.clientY - lastY; moved += Math.abs(dx) + Math.abs(dy);
+  world.rotation.y += dx * 0.008;
+  world.rotation.x = Math.max(-1.4, Math.min(1.4, world.rotation.x + dy * 0.008));
+  lastX = e.clientX; lastY = e.clientY;
+});
+canvas.addEventListener("pointerup", e => {
+  pointers.delete(e.pointerId); canvas.classList.remove("dragging");
+  if (moved < 5 && pointers.size === 0) pick(e.clientX, e.clientY); dragging = false;
+});
+canvas.addEventListener("pointercancel", e => { pointers.delete(e.pointerId); dragging = false; canvas.classList.remove("dragging"); });
+canvas.addEventListener("wheel", e => { e.preventDefault(); camDist = Math.min(40, Math.max(5, camDist * (1 + e.deltaY * 0.001))); }, { passive: false });
+
+const ray = new THREE.Raycaster();
+function pick(x, y) {
+  ray.setFromCamera(new THREE.Vector2((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1), camera);
+  const hits = ray.intersectObjects(G.nodes.map(n => n.mesh));
+  if (!hits.length) return;
+  const idx = hits[0].object.userData.idx;
+  if (selected.length >= 2) selected = [];
+  if (selected.includes(idx)) return;
+  selected.push(idx); updateSelection();
+}
+
+// dropdown grouped by type
+const sel = document.getElementById("preset"), groups = {};
+Object.keys(SPECS).forEach(k => {
+  const g = SPECS[k].group;
+  if (!groups[g]) { groups[g] = document.createElement("optgroup"); groups[g].label = g; sel.appendChild(groups[g]); }
+  const o = document.createElement("option"); o.value = k; o.textContent = SPECS[k].name; groups[g].appendChild(o);
+});
+sel.addEventListener("change", () => build(sel.value));
+document.getElementById("reset").addEventListener("click", () => { selected = []; updateSelection(); });
+document.getElementById("spin").addEventListener("click", e => { autoSpin = !autoSpin; e.target.textContent = autoSpin ? "Pause rotation" : "Resume rotation"; });
+addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) { autoSpin = false; document.getElementById("spin").textContent = "Resume rotation"; }
+
+function animate() {
+  requestAnimationFrame(animate);
+  if (autoSpin && !dragging) world.rotation.y += 0.004;
+  camera.position.z += (camDist - camera.position.z) * 0.12;
+  camera.setViewOffset(innerWidth, innerHeight, innerWidth > 800 ? -160 : 0, 0, innerWidth, innerHeight);
+  renderer.render(scene, camera);
+}
+build("d30");
+animate();
+</script>
+</body>
+</html>
