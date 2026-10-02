@@ -35,7 +35,7 @@
   .dot.dist { background:var(--meet); } .dot.nondist { background:var(--join); } .dot.nolat { background:var(--bad); }
  
   /* ---------- stage ---------- */
-  #stage { position:relative; overflow:hidden; min-width:0; min-height:0; background:radial-gradient(ellipse at 50% 40%, #151c33 0%, var(--bg) 70%); }
+  #stage { position:relative; isolation:isolate; overflow:hidden; min-width:0; min-height:0; background:radial-gradient(ellipse at 50% 40%, #151c33 0%, var(--bg) 70%); }
   #stage canvas { display:block; touch-action:none; cursor:grab; }
   #stage canvas.dragging { cursor:grabbing; } #stage canvas.over { cursor:pointer; }
   #labels { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
@@ -93,6 +93,46 @@
   .key { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:18px; color:var(--muted); font-size:12px; }
   .key i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:baseline; }
  
+  /* ---------- intro ---------- */
+  #intro { position:fixed; inset:0; z-index:100000; overflow:hidden;
+    background:radial-gradient(ellipse at 50% 45%, #1b2450 0%, #0c101b 68%); }
+  #intro canvas { position:absolute; inset:0; display:block; }
+  #introCenter { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; }
+  #introCenter .wrap { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .eyebrow { letter-spacing:.38em; text-transform:uppercase; font-size:12px; color:var(--muted); transition:opacity .5s, transform .6s; }
+  .eyebrow.go { opacity:0; transform:translateY(-20px); }
+  #bgCanvas { pointer-events:none; }
+  #startBtn { pointer-events:auto; position:relative; border:0; cursor:pointer; padding:4px 36px; font-family:inherit;
+    font-size:clamp(52px,10vw,104px); font-weight:700; letter-spacing:-.02em;
+    color:transparent; -webkit-text-fill-color:transparent;
+    background:linear-gradient(100deg,#fff 0%,#9fb4ff 20%,#ff8fd0 40%,#ffd36b 60%,#7dffd0 80%,#fff 100%) 0 0/300% 100%;
+    -webkit-background-clip:text; background-clip:text;
+    animation:sheen 5s linear infinite, breathe 3.2s ease-in-out infinite;
+    transition:transform .8s cubic-bezier(.2,.8,.2,1), opacity .6s, filter .7s, letter-spacing .5s; }
+  #startBtn:hover { letter-spacing:.04em; transform:scale(1.06); }
+  #startBtn.go { animation:none; transform:scale(3.4); opacity:0; filter:blur(14px); pointer-events:none; }
+  @keyframes sheen { to { background-position:300% 0; } }
+  @keyframes breathe { 0%,100% { filter:drop-shadow(0 0 18px rgba(140,160,255,.55)) drop-shadow(0 0 50px rgba(120,140,255,.3)); }
+                       50%     { filter:drop-shadow(0 0 28px rgba(255,150,220,.8)) drop-shadow(0 0 80px rgba(130,150,255,.5)); } }
+  .btnwrap { position:relative; display:grid; place-items:center; }
+  .ring { position:absolute; inset:-14% -8%; border-radius:50%; border:1.5px dashed rgba(160,180,255,.35); pointer-events:none; animation:spin 18s linear infinite; transition:opacity .4s; }
+  .ring.r2 { inset:-32% -22%; border:1px solid rgba(255,140,200,.2); border-top-color:rgba(255,200,87,.8); animation-duration:11s; animation-direction:reverse; }
+  .ring.r3 { inset:-58% -40%; border:1px dotted rgba(120,230,200,.3); animation-duration:30s; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #intro.go .ring { opacity:0; }
+  .eyebrow { background:linear-gradient(90deg,#8b95b6,#fff,#8b95b6) 0 0/200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:sheen2 3s linear infinite, none; }
+  @keyframes sheen2 { to { background-position:-200% 0; } }
+  #tagline { min-height:1.6em; margin-top:14px; font-size:15px; letter-spacing:.12em; color:#aab6e6; transition:opacity .5s; }
+  #tagline::after { content:"\25AE"; margin-left:3px; color:#ff8fd0; animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  #tagline.go { opacity:0; }
+  #soundBtn { position:absolute; left:18px; bottom:16px; background:transparent; border:1px solid var(--line); color:var(--muted);
+    border-radius:8px; padding:6px 12px; font-size:12.5px; cursor:pointer; }
+  #soundBtn:hover { color:var(--text); border-color:#4a5688; }
+  #skipIntro { position:absolute; right:18px; bottom:16px; background:transparent; border:1px solid var(--line); color:var(--muted);
+    border-radius:8px; padding:6px 12px; font-size:12.5px; cursor:pointer; }
+  #skipIntro:hover { color:var(--text); border-color:#4a5688; }
+ 
   /* ---------- mobile ---------- */
   @media (max-width:880px) {
     #app { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) minmax(0,44vh); }
@@ -148,6 +188,18 @@
       <span><i style="background:var(--meet)"></i>meet</span>
     </div>
   </aside>
+</div>
+ 
+<div id="intro">
+  <canvas id="bgCanvas"></canvas>
+  <canvas id="introCanvas"></canvas>
+  <div id="introCenter"><div class="wrap">
+    <div class="eyebrow" id="introEyebrow">Lattice explorer</div>
+    <div class="btnwrap"><i class="ring"></i><i class="ring r2"></i><i class="ring r3"></i><button id="startBtn">Start</button></div>
+    <div id="tagline"></div>
+  </div></div>
+  <button id="soundBtn">Sound: on</button>
+  <button id="skipIntro">Skip intro</button>
 </div>
  
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -549,6 +601,262 @@ resize();
 build("d30");
 animate();
 </script>
+ 
+<script>
+/* ================= Intro =================
+   12 names float in 3D. On Start they burst out, fly into the 12 nodes of the divisor lattice of 60,
+   the Hasse edges light up rank by rank, then the camera warps into the explorer. */
+(function () {
+  const NAMES = ["Aryan","Kumar","Krishna","Mansi","Sunay","Mayank","Rahil","Dev","Shivu","Jigs","Ranjeet","Pranav"];   // 12 names, one per node of the lattice
+ 
+  const intro = document.getElementById("intro"), cv = document.getElementById("introCanvas"), ctx = cv.getContext("2d");
+  const btn = document.getElementById("startBtn"), skip = document.getElementById("skipIntro"), eyebrow = document.getElementById("introEyebrow");
+  const bg = document.getElementById("bgCanvas"), bctx = bg.getContext("2d"), tagline = document.getElementById("tagline"), soundBtn = document.getElementById("soundBtn");
+  const spec = SPECS.d60, A = spec.A, n = Math.min(spec.labels.length, NAMES.length);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+ 
+  // lattice targets (centered, scaled)
+  const mn = [1e9,1e9,1e9], mx = [-1e9,-1e9,-1e9];
+  spec.pos.forEach(p => p.forEach((v, k) => { mn[k] = Math.min(mn[k], v); mx[k] = Math.max(mx[k], v); }));
+  const cen = mn.map((v, k) => (v + mx[k]) / 2);
+  const T = spec.pos.map(p => p.map((v, k) => (v - cen[k]) * 0.78));
+  const maxRank = Math.max(A.height, 1);
+  const hue = i => (0.62 - 0.62 * A.rank[i] / maxRank) * 360;
+ 
+  let W = 1, H = 1, U = 100, dpr = 1;
+  function size() {
+    dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
+    bg.width = cv.width; bg.height = cv.height; bg.style.width = W + "px"; bg.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); U = Math.min(W / 8, H / 6.2);
+  }
+  size(); addEventListener("resize", size);
+ 
+  // deterministic pseudo-random so the layout is stable
+  let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const orb = NAMES.slice(0, n).map((_, i) => ({
+    th: (i / n) * Math.PI * 2 + (rnd() - .5) * .4, w: (0.10 + rnd() * 0.10) * (i % 2 ? 1 : -1),
+    rx: 2.5 + rnd() * 0.8, ry: 1.3 + rnd() * 0.7, rz: 1.1 + rnd() * 0.5, ph: rnd() * 6.28 }));
+  const fp = (i, t) => { const o = orb[i], th = o.th + o.w * t;
+    return [o.rx * Math.cos(th), o.ry * Math.sin(th) + 0.16 * Math.sin(t * 0.9 + o.ph), o.rz * Math.sin(th * 1.3 + o.ph)]; };
+ 
+  function proj(p, ang, tilt, zoom) {
+    const ca = Math.cos(ang), sa = Math.sin(ang), ct = Math.cos(tilt), st = Math.sin(tilt);
+    const x1 = p[0] * ca + p[2] * sa, z1 = -p[0] * sa + p[2] * ca;
+    const y1 = p[1] * ct - z1 * st, z2 = p[1] * st + z1 * ct;
+    const s = 7 / (7 - z2);
+    return { x: W / 2 + x1 * U * s * zoom, y: H / 2 - y1 * U * s * zoom, s, z: z2 };
+  }
+  const clamp = x => Math.max(0, Math.min(1, x));
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  const easeBack = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+  const easeIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  const smooth = x => x * x * (3 - 2 * x);
+ 
+  let t0 = performance.now(), last = t0, clickT = null, done = false, built = false;
+  let mxs = 0, mys = 0, tx = 0, ty = 0, lastAng = 0, lastTilt = 0.2, angC = 0, tiltC = 0, angT = 0;
+  const sparks = [];
+  let vt = 0, sp = 1, spT = 1, px = -999, py = -999, pxs = -999, pys = -999, soundOn = true, actx = null;
+  const ripples = [];
+  const stars = Array.from({ length: 360 }, () => ({ x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, z: Math.random(), h: 190 + Math.random() * 140 }));
+
+  // ---- tiny synth sounds (quiet, toggleable) ----
+  function ac() { if (!soundOn) return null; try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); return actx; } catch (e) { return null; } }
+  function blip(f) { const a = ac(); if (!a) return; const o = a.createOscillator(), g = a.createGain(), t = a.currentTime;
+    o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 2, t + .18);
+    g.gain.setValueAtTime(.06, t); g.gain.exponentialRampToValueAtTime(.0001, t + .25); o.connect(g).connect(a.destination); o.start(); o.stop(t + .3); }
+  function whoosh() { const a = ac(); if (!a) return; const t = a.currentTime, o = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
+    o.type = "sawtooth"; f.type = "lowpass";
+    o.frequency.setValueAtTime(55, t); o.frequency.exponentialRampToValueAtTime(880, t + 3.6);
+    f.frequency.setValueAtTime(200, t); f.frequency.exponentialRampToValueAtTime(5000, t + 3.6);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.09, t + 1.2); g.gain.exponentialRampToValueAtTime(.0001, t + 4.4);
+    o.connect(f).connect(g).connect(a.destination); o.start(t); o.stop(t + 4.5);
+    [523.25, 659.25, 783.99, 1046.5].forEach((fr, k) => { const o2 = a.createOscillator(), g2 = a.createGain(), s0 = t + .4 + k * .35;
+      o2.type = "triangle"; o2.frequency.value = fr; g2.gain.setValueAtTime(.0001, s0); g2.gain.exponentialRampToValueAtTime(.05, s0 + .03); g2.gain.exponentialRampToValueAtTime(.0001, s0 + .9);
+      o2.connect(g2).connect(a.destination); o2.start(s0); o2.stop(s0 + 1); }); }
+  soundBtn.addEventListener("click", () => { soundOn = !soundOn; soundBtn.textContent = "Sound: " + (soundOn ? "on" : "off"); if (soundOn) blip(520); });
+
+  // ---- typewriter tagline ----
+  const LINES = ["Where order meets chaos.", "Every pair has a join. Every pair has a meet.", "12 names. 1 lattice. Zero chill.", "Move your mouse. Click anywhere. Break things.", "Press Enter to launch."];
+  let li = 0, ci = 0, dir = 1, hold = 0;
+  const typer = setInterval(() => { if (done) { clearInterval(typer); return; }
+    if (hold > 0) { hold--; return; }
+    const str = LINES[li]; ci += dir; tagline.textContent = str.slice(0, ci);
+    if (dir === 1 && ci >= str.length) { dir = -1; hold = 30; } else if (dir === -1 && ci <= 0) { dir = 1; li = (li + 1) % LINES.length; hold = 5; } }, 55);
+
+  // ---- background: nebula, parallax starfield, hyperspace streaks, cursor glow ----
+  function drawBg(t, dt, tt) {
+    const c = bctx; c.setTransform(dpr, 0, 0, dpr, 0, 0); c.globalCompositeOperation = "source-over"; c.clearRect(0, 0, W, H);
+    c.globalCompositeOperation = "lighter";
+    const warp = tt < 0 ? 0 : clamp(tt / 3.2), R = Math.max(W, H) * 0.5;
+    [[110, 90, 255], [255, 80, 160], [50, 200, 255]].forEach((col, k) => {
+      const x = W * (0.5 + 0.38 * Math.cos(t * 0.11 + k * 2.1)) - mxs * 40, y = H * (0.5 + 0.32 * Math.sin(t * 0.08 + k * 1.7)) - mys * 30;
+      const g = c.createRadialGradient(x, y, 0, x, y, R); g.addColorStop(0, `rgba(${col},${0.17 + 0.2 * warp})`); g.addColorStop(1, `rgba(${col},0)`);
+      c.fillStyle = g; c.fillRect(0, 0, W, H); });
+    if (px > -900 && tt < 0) { const g = c.createRadialGradient(pxs, pys, 0, pxs, pys, 190); g.addColorStop(0, "rgba(170,190,255,.22)"); g.addColorStop(1, "rgba(170,190,255,0)");
+      c.fillStyle = g; c.fillRect(pxs - 190, pys - 190, 380, 380); }
+    const speed = reduced ? 0 : 0.06 + 4.5 * warp * warp; c.lineCap = "round";
+    for (const st of stars) {
+      const dz = speed * dt; st.z -= dz;
+      let sx = W / 2 + st.x * W * 0.28 / st.z, sy = H / 2 + st.y * W * 0.28 / st.z;
+      if (st.z < 0.02 || Math.abs(sx - W / 2) > W * 0.7 || Math.abs(sy - H / 2) > H * 0.9) { st.x = Math.random() * 2 - 1; st.y = Math.random() * 2 - 1; st.z = 1; continue; }
+      const pz = st.z + dz * (1 + warp * 6) + 0.004, ox = -mxs * 30 * (1 - st.z), oy = -mys * 20 * (1 - st.z);
+      const ex = W / 2 + st.x * W * 0.28 / pz, ey = H / 2 + st.y * W * 0.28 / pz;
+      const a = 0.2 + 0.8 * (1 - st.z) * (0.75 + 0.25 * Math.sin(t * 3 + st.h));
+      c.strokeStyle = `hsla(${st.h},80%,82%,${a})`; c.lineWidth = (1 - st.z) * 2.2 + 0.6;
+      c.beginPath(); c.moveTo(ex + ox, ey + oy); c.lineTo(sx + ox, sy + oy); c.stroke(); }
+  }
+ 
+  intro.addEventListener("pointermove", e => { tx = (e.clientX / W - .5) * 2; ty = (e.clientY / H - .5) * 2; px = e.clientX; py = e.clientY;
+    if (pxs < -900) { pxs = px; pys = py; }
+    if (clickT === null && sparks.length < 500 && Math.random() < 0.5) sparks.push({ x: px, y: py, vx: (Math.random() - .5) * 90, vy: (Math.random() - .5) * 90 + 20, life: .7, h: (performance.now() / 8) % 360 }); });
+  intro.addEventListener("pointerdown", e => { if (clickT !== null || e.target.closest("button")) return;
+    ripples.push({ x: e.clientX, y: e.clientY, t: performance.now(), h: Math.random() * 360 });
+    for (let k = 0; k < 50; k++) { const a = Math.random() * 6.283, v = 120 + Math.random() * 420;
+      sparks.push({ x: e.clientX, y: e.clientY, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, h: (e.clientX / W * 360 + Math.random() * 60) % 360 }); }
+    blip(300 + Math.random() * 500); });
+  btn.addEventListener("pointerenter", () => { if (clickT === null) spT = 2.6; });
+  btn.addEventListener("pointerleave", () => { spT = 1; });
+  function ensureBuild() { if (!built) { built = true; build("d60"); } }
+  function finish() { if (done) return; done = true; ensureBuild(); intro.style.display = "none"; }
+ 
+  btn.addEventListener("click", () => {
+    if (clickT !== null) return;
+    if (reduced) { ensureBuild(); intro.style.transition = "opacity .4s"; intro.style.opacity = "0"; setTimeout(finish, 450); return; }
+    clickT = performance.now(); angC = lastAng; tiltC = lastTilt;
+    angT = 0.6 + Math.PI * 2 * (Math.ceil((angC - 0.6) / (Math.PI * 2)) + 1);
+    btn.classList.add("go"); eyebrow.classList.add("go"); tagline.classList.add("go"); intro.classList.add("go"); spT = 1; whoosh();
+    for (let k = 0; k < 280; k++) { const a = Math.random() * 6.283, v = 250 + Math.random() * 1300;
+      sparks.push({ x: W / 2, y: H / 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, h: Math.random() * 360 }); }
+  });
+  skip.addEventListener("click", finish);
+  addEventListener("keydown", e => { if (done) return; if (e.key === "Escape") finish(); else if (e.key === "Enter" && clickT === null) btn.click(); });
+ 
+  function frame(now) {
+    if (done) return;
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    sp += (spT - sp) * 0.06; vt += dt * sp; const t = vt;
+    const tt = clickT === null ? -1 : (now - clickT) / 1000;
+    mxs += (tx - mxs) * 0.05; mys += (ty - mys) * 0.05; pxs += (px - pxs) * 0.18; pys += (py - pys) * 0.18;
+    drawBg(t, dt, tt);
+    if (tt >= 0 && tt < 0.7) { const am = 12 * (1 - tt / 0.7); intro.style.transform = `translate(${(Math.random() - .5) * am}px,${(Math.random() - .5) * am}px)`; }
+    else if (intro.style.transform) intro.style.transform = "";
+ 
+    // camera
+    let ang, tilt, zoom = 1, wu = 0;
+    if (tt < 0) { ang = 0.12 * t + mxs * 0.35; tilt = 0.18 + mys * 0.12; }
+    else {
+      const e = easeIO(clamp(tt / 3.2));
+      ang = angC + (angT - angC) * e; tilt = tiltC + (0.35 - tiltC) * e;
+      wu = clamp((tt - 3.5) / 1.0); zoom = 1 + 26 * wu * wu * wu; ang += 0.6 * wu * wu;
+    }
+    lastAng = ang; lastTilt = tilt;
+ 
+    // positions
+    const items = [];
+    for (let i = 0; i < n; i++) {
+      let p = fp(i, t), u = 0;
+      if (tt >= 0) {
+        const push = 1 + 0.4 * Math.sin(Math.PI * clamp(tt / 0.8));
+        p = p.map(v => v * push);
+        u = clamp((tt - (0.25 + i * 0.07)) / 1.3);
+        const e = easeBack(u);
+        p = p.map((v, k) => v + (T[i][k] - v) * e);
+      }
+      items.push({ i, p, u, q: proj(p, ang, tilt, zoom) });
+      if (tt < 0 && px > -900) { const q = items[items.length - 1].q, dx = q.x - pxs, dy = q.y - pys, d = Math.hypot(dx, dy) || 1, R = Math.max(120, U * 1.1);
+        if (d < R) { const k = Math.pow(1 - d / R, 2) * R * 0.55; q.x += dx / d * k; q.y += dy / d * k; } }
+    }
+ 
+    // clear (leave trails while warping)
+    if (wu > 0) { ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "rgba(12,16,27,.22)"; ctx.fillRect(0, 0, W, H); }
+    else ctx.clearRect(0, 0, W, H);
+ 
+    // rings + sparks
+    if (tt >= 0) {
+      [[0, "160,180,255"], [0.18, "255,200,87"], [0.36, "255,107,139"]].forEach(([d, c]) => {
+        const r = tt - d;
+        if (r > 0 && r < 1.4) { ctx.beginPath(); ctx.arc(W / 2, H / 2, r * Math.max(W, H) * 0.75, 0, 6.283);
+          ctx.strokeStyle = `rgba(${c},${0.7 * (1 - r / 1.4)})`; ctx.lineWidth = 3; ctx.stroke(); }
+      });
+    }
+    for (let k = ripples.length - 1; k >= 0; k--) { const r = ripples[k], a = (now - r.t) / 1000; if (a > 1.2) { ripples.splice(k, 1); continue; }
+      ctx.beginPath(); ctx.arc(r.x, r.y, a * 260, 0, 6.283); ctx.strokeStyle = `hsla(${r.h},90%,70%,${0.8 * (1 - a / 1.2)})`; ctx.lineWidth = 1 + 3 * (1 - a / 1.2); ctx.stroke(); }
+    ctx.globalCompositeOperation = "lighter";
+    for (let k = sparks.length - 1; k >= 0; k--) {
+      const s = sparks[k]; s.x += s.vx * dt; s.y += s.vy * dt; s.vx *= 0.96; s.vy *= 0.96; s.life -= dt * 0.9;
+      if (s.life <= 0) { sparks.splice(k, 1); continue; }
+      ctx.strokeStyle = `hsla(${s.h},90%,70%,${s.life})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(s.x - s.vx * 0.03, s.y - s.vy * 0.03); ctx.lineTo(s.x, s.y); ctx.stroke();
+    }
+ 
+    // faint constellation lines while floating
+    const cf = tt < 0 ? 1 : 1 - clamp(tt / 0.5);
+    if (cf > 0) for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) {
+      const d = Math.hypot(items[a].p[0] - items[b].p[0], items[a].p[1] - items[b].p[1], items[a].p[2] - items[b].p[2]);
+      if (d < 2.6) { ctx.strokeStyle = `rgba(140,160,255,${(1 - d / 2.6) * 0.28 * cf})`; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(items[a].q.x, items[a].q.y); ctx.lineTo(items[b].q.x, items[b].q.y); ctx.stroke(); }
+    }
+ 
+    // Hasse edges drawing in, rank by rank, with travelling pulses
+    if (tt >= 0) {
+      const lw = 2 * Math.min(zoom, 5);
+      spec.covers.forEach(([a, b], k) => {
+        if (a >= n || b >= n) return;
+        const p = clamp((tt - (1.5 + A.rank[a] * 0.28)) / 0.55); if (p <= 0) return;
+        const qa = items[a].q, qb = items[b].q, f = easeOut(p);
+        const ex = qa.x + (qb.x - qa.x) * f, ey = qa.y + (qb.y - qa.y) * f;
+        const g = ctx.createLinearGradient(qa.x, qa.y, qb.x, qb.y);
+        g.addColorStop(0, `hsla(${hue(a)},85%,65%,.95)`); g.addColorStop(1, `hsla(${hue(b)},85%,65%,.95)`);
+        ctx.strokeStyle = g; ctx.lineWidth = lw; ctx.shadowColor = `hsl(${hue(b)},90%,60%)`; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.moveTo(qa.x, qa.y); ctx.lineTo(ex, ey); ctx.stroke(); ctx.shadowBlur = 0;
+        if (p >= 1 && tt > 2.9) { const fr = (tt * 0.9 + k * 0.17) % 1;
+          ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.beginPath();
+          ctx.arc(qa.x + (qb.x - qa.x) * fr, qa.y + (qb.y - qa.y) * fr, 3 * Math.min(zoom, 4), 0, 6.283); ctx.fill(); }
+      });
+    }
+ 
+    // names / nodes, far to near
+    items.sort((a, b) => a.q.z - b.q.z);
+    ctx.globalCompositeOperation = "source-over";
+    const FSF = Math.max(20, Math.min(30, U * 0.2)), FSL = Math.max(11, Math.min(17, U * 0.12));
+    items.forEach(it => {
+      const { i, u, q } = it, star = i === 0, h = star ? 45 : hue(i), zs = Math.pow(zoom, 0.8);
+      const depth = 0.6 + 0.4 * clamp((q.s - 0.83) / 0.42);
+      const gl = tt >= 0 ? clamp(1 - Math.abs(tt - (2.2 + A.rank[i] * 0.28)) / 0.35) : 0;
+      const fs = (FSF + (FSL - FSF) * u) * q.s * zs * (star ? 1.22 : 1);
+      ctx.font = `700 ${fs}px Figtree, "Segoe UI", sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      if (u > 0) {                                   // name pill that grows around the text
+        const tw = ctx.measureText(NAMES[i]).width, pw = (tw + fs * 1.4) * (0.4 + 0.6 * u), ph = fs * 1.9 * (0.4 + 0.6 * u), r = ph / 2;
+        ctx.shadowColor = `hsl(${h},90%,${60 + gl * 25}%)`; ctx.shadowBlur = 12 + gl * 26;
+        ctx.fillStyle = `hsla(${h},${star ? 95 : 70}%,${star ? 56 + gl * 14 : 46 + gl * 22}%,${0.96 * u})`;
+        ctx.beginPath(); ctx.moveTo(q.x - pw / 2 + r, q.y - r); ctx.lineTo(q.x + pw / 2 - r, q.y - r);
+        ctx.arc(q.x + pw / 2 - r, q.y, r, -Math.PI / 2, Math.PI / 2); ctx.lineTo(q.x - pw / 2 + r, q.y + r);
+        ctx.arc(q.x - pw / 2 + r, q.y, r, Math.PI / 2, Math.PI * 1.5); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
+        ctx.strokeStyle = `rgba(255,255,255,${0.75 * u})`; ctx.lineWidth = 1.5; ctx.stroke();
+      }
+      ctx.shadowColor = `hsl(${h},90%,65%)`; ctx.shadowBlur = u < 1 ? 14 : 0;
+      const darkText = star && u > 0.5;
+      if (!darkText) { ctx.lineJoin = "round"; ctx.lineWidth = fs * 0.2; ctx.strokeStyle = "rgba(8,10,20,.6)"; ctx.shadowBlur = 0; ctx.strokeText(NAMES[i], q.x, q.y + fs * 0.04); }
+      ctx.shadowColor = `hsl(${h},90%,65%)`; ctx.shadowBlur = u < 1 ? 14 : 0;
+      ctx.fillStyle = darkText ? "#1a1200" : u > 0.5 ? "#fff" : `hsla(${h},85%,84%,${depth})`;
+      ctx.fillText(NAMES[i], q.x, q.y + fs * 0.04); ctx.shadowBlur = 0;
+    });
+ 
+    // flash + fade into the explorer
+    if (wu > 0) {
+      ensureBuild();
+      const fa = smooth(clamp((wu - 0.6) / 0.4));
+      if (fa > 0) { const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
+        g.addColorStop(0, `rgba(255,255,255,${fa})`); g.addColorStop(1, `rgba(150,170,255,${fa * 0.85})`);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+      if (tt > 4.3) intro.style.opacity = String(Math.max(0, 1 - (tt - 4.3) / 0.5));
+      if (tt >= 4.8) finish();
+    }
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
 </body>
 </html>
- 
