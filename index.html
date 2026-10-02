@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0c101b">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>3D Lattice Explorer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -191,6 +194,7 @@
       <button id="clear">Clear</button>
       <span class="sep"></span>
       <button id="sfx" aria-pressed="true" aria-label="Toggle click sound">Sound</button>
+      <button id="replay" aria-label="Replay intro">Intro</button>
     </div>
   </main>
  
@@ -212,7 +216,8 @@
       <span><i style="background:var(--join)"></i>join</span>
       <span><i style="background:var(--meet)"></i>meet</span>
     </div>
-  </aside>
+    <p style="margin:14px 0 0;font-size:11px;color:var(--muted);opacity:.7">Build: intro-v3</p>
+</aside>
 </div>
  
 <div id="intro">
@@ -639,6 +644,7 @@ function setSpin(on) { autoSpin = on; $("spin").setAttribute("aria-pressed", Str
 $("spin").addEventListener("click", () => setSpin(!autoSpin));
 $("clear").addEventListener("click", () => { selected = []; refresh(); });
 $("sfx").addEventListener("click", () => SFX.set(!SFX.on));
+$("replay").addEventListener("click", () => { if (window.replayIntro) window.replayIntro(); });
 addEventListener("keydown", e => {
   if (e.key === "Escape") { selected = []; refresh(); }
   else if (e.key === "r" || e.key === "R") setSpin(!autoSpin);
@@ -686,7 +692,7 @@ animate();
   const btn = document.getElementById("startBtn"), skip = document.getElementById("skipIntro"), eyebrow = document.getElementById("introEyebrow");
   const bg = document.getElementById("bgCanvas"), bctx = bg.getContext("2d"), tagline = document.getElementById("tagline"), soundBtn = document.getElementById("soundBtn");
   const spec = SPECS.d60, A = spec.A, n = Math.min(spec.labels.length, NAMES.length);
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduced = false;   // always play the full intro, even if the OS has "reduce motion" on
  
   // lattice targets (centered, scaled)
   const mn = [1e9,1e9,1e9], mx = [-1e9,-1e9,-1e9];
@@ -752,10 +758,12 @@ animate();
   // ---- typewriter tagline ----
   const LINES = ["Where order meets chaos.", "Every pair has a join. Every pair has a meet.", "12 names. 1 lattice. Zero chill.", "Move your mouse. Click anywhere. Break things.", "Press Enter to launch."];
   let li = 0, ci = 0, dir = 1, hold = 0;
-  const typer = setInterval(() => { if (done) { clearInterval(typer); return; }
+  let typer = null;
+  function startTyper() { clearInterval(typer); typer = setInterval(() => { if (done) { clearInterval(typer); return; }
     if (hold > 0) { hold--; return; }
     const str = LINES[li]; ci += dir; tagline.textContent = str.slice(0, ci);
-    if (dir === 1 && ci >= str.length) { dir = -1; hold = 30; } else if (dir === -1 && ci <= 0) { dir = 1; li = (li + 1) % LINES.length; hold = 5; } }, 55);
+    if (dir === 1 && ci >= str.length) { dir = -1; hold = 30; } else if (dir === -1 && ci <= 0) { dir = 1; li = (li + 1) % LINES.length; hold = 5; } }, 55); }
+  startTyper();
 
   // ---- background: nebula, parallax starfield, hyperspace streaks, cursor glow ----
   function drawBg(t, dt, tt) {
@@ -930,6 +938,14 @@ animate();
       if (tt >= 4.8) finish();
     }
   }
+  window.replayIntro = function () {
+    if (!done) return;
+    done = false; clickT = null; sparks.length = 0; ripples.length = 0; vt = 0; sp = 1; spT = 1; last = performance.now();
+    intro.style.cssText = "";
+    [btn, eyebrow, tagline, intro].forEach(el => el.classList.remove("go"));
+    li = 0; ci = 0; dir = 1; hold = 0; tagline.textContent = "";
+    startTyper(); requestAnimationFrame(frame);
+  };
   requestAnimationFrame(frame);
 })();
 </script>
