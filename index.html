@@ -2,23 +2,26 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c101b">
 <title>3D Lattice Explorer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:#0c101b; --panel:#121828; --panel2:#182037; --line:#262f4c; --text:#e9edf9; --muted:#8b95b6;
-    --sel:#ff6b8b; --join:#ffc857; --meet:#5be3a8; --up:#c08bff; --down:#5fb6ff; --bad:#ff8a5b;
+    --bg:#0a0e18; --panel:#141b2f; --panel2:#1e2848; --line:#37457a; --text:#f6f8ff; --muted:#bcc6e6;
+    --sel:#ff6b8b; --join:#ffd166; --meet:#5ef0b2; --up:#d0a4ff; --down:#74c2ff; --bad:#ff9a6b;
   }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
     font-family:"Figtree","Segoe UI",system-ui,-apple-system,sans-serif; font-size:14px; overflow:hidden; }
-  button { font-family:inherit; color:inherit; }
+  button { font-family:inherit; color:inherit; -webkit-tap-highlight-color:transparent; touch-action:manipulation; transition:transform .08s ease, background .12s, border-color .12s; }
+  button:active { transform:scale(.95); }
   button:focus-visible { outline:2px solid #8fa2ff; outline-offset:2px; }
  
   #app { display:grid; grid-template-columns:250px minmax(0,1fr) 330px; height:100%; }
+  @supports (height:100dvh) { #app { height:100dvh; } }
  
   /* ---------- left rail ---------- */
   #rail { background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
@@ -30,7 +33,9 @@
   .ex { display:flex; align-items:center; justify-content:space-between; gap:8px; text-align:left; width:100%;
     background:transparent; border:1px solid transparent; border-radius:8px; padding:9px 10px; cursor:pointer; font-size:13.5px; }
   .ex:hover { background:var(--panel2); }
-  .ex.active { background:var(--panel2); border-color:#3b4776; }
+  .ex .dot { box-shadow:0 0 8px currentColor; }
+  .dot.dist { color:var(--meet); } .dot.nondist { color:var(--join); } .dot.nolat { color:var(--bad); }
+  .ex.active { background:#2a3560; border-color:#7d8de0; font-weight:600; }
   .ex .dot { width:8px; height:8px; border-radius:50%; flex:none; }
   .dot.dist { background:var(--meet); } .dot.nondist { background:var(--join); } .dot.nolat { background:var(--bad); }
  
@@ -39,37 +44,38 @@
   #stage canvas { display:block; touch-action:none; cursor:grab; }
   #stage canvas.dragging { cursor:grabbing; } #stage canvas.over { cursor:pointer; }
   #labels { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
-  .lab { position:absolute; left:0; top:0; padding:2px 8px; border-radius:999px; font-weight:600; font-size:14px; white-space:nowrap;
-    background:rgba(12,16,27,.78); border:1px solid #2f3a62; transition:background .12s,border-color .12s,color .12s; will-change:transform; }
-  .lab.sel  { background:var(--sel);  color:#1a0b10; border-color:var(--sel); }
-  .lab.join { background:var(--join); color:#201700; border-color:var(--join); }
-  .lab.meet { background:var(--meet); color:#04241a; border-color:var(--meet); }
+  .lab { position:absolute; left:0; top:0; padding:3px 10px; border-radius:999px; font-weight:700; font-size:15px; white-space:nowrap;
+    color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.6); box-shadow:0 2px 8px rgba(0,0,0,.45);
+    background:rgba(8,11,22,.92); border:1.5px solid #6676b8; transition:background .12s,border-color .12s,color .12s; will-change:transform; }
+  .lab.sel  { background:var(--sel);  color:#1a0b10; border-color:#fff; text-shadow:none; }
+  .lab.join { background:var(--join); color:#201700; border-color:#fff; text-shadow:none; }
+  .lab.meet { background:var(--meet); color:#04241a; border-color:#fff; text-shadow:none; }
   .lab.up   { border-color:var(--up);   color:var(--up); }
   .lab.down { border-color:var(--down); color:var(--down); }
-  .lab.hov  { background:#fff; color:#0c101b; border-color:#fff; }
+  .lab.hov  { background:#fff; color:#0c101b; border-color:#fff; text-shadow:none; }
  
   #toolbar { position:absolute; left:50%; bottom:16px; transform:translateX(-50%); display:flex; align-items:center; gap:4px;
-    background:rgba(18,24,40,.92); border:1px solid var(--line); border-radius:12px; padding:5px; backdrop-filter:blur(6px); }
-  #toolbar button { background:transparent; border:0; border-radius:8px; padding:7px 12px; font-size:13px; cursor:pointer; color:var(--muted); font-weight:500; }
+    background:rgba(20,27,47,.95); border:1px solid #4a5a96; border-radius:14px; padding:5px; backdrop-filter:blur(8px); box-shadow:0 6px 24px rgba(0,0,0,.5); }
+  #toolbar button { background:transparent; border:0; border-radius:10px; padding:8px 13px; font-size:13.5px; cursor:pointer; color:var(--muted); font-weight:600; white-space:nowrap; }
   #toolbar button:hover { background:var(--panel2); color:var(--text); }
-  #toolbar button[aria-pressed="true"] { background:#2a3560; color:var(--text); }
+  #toolbar button[aria-pressed="true"] { background:#35449a; color:#fff; }
   #toolbar .sep { width:1px; height:20px; background:var(--line); margin:0 4px; }
-  #hint { position:absolute; left:16px; top:14px; color:var(--muted); font-size:12.5px; line-height:1.5; pointer-events:none; max-width:300px; }
+  #hint { position:absolute; left:16px; top:14px; color:var(--muted); font-size:13px; line-height:1.5; pointer-events:none; max-width:300px; }
  
   /* ---------- info panel ---------- */
   #info { background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; padding:18px 16px 20px; min-height:0; }
   #info h2 { margin:0 0 8px; font-size:17px; font-weight:700; letter-spacing:-.01em; }
   .badges { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
-  .badge { font-size:12px; font-weight:600; padding:3px 9px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); color:var(--muted); }
-  .badge.good { color:var(--meet); border-color:#2b6a55; } .badge.warn { color:var(--join); border-color:#6d5a24; } .badge.bad { color:var(--bad); border-color:#733d27; }
+  .badge { font-size:12.5px; font-weight:700; padding:4px 10px; border-radius:999px; background:var(--panel2); border:1px solid #4a5a96; color:var(--text); }
+  .badge.good { color:var(--meet); border-color:#3fae86; } .badge.warn { color:var(--join); border-color:#b8933a; } .badge.bad { color:var(--bad); border-color:#c9693f; }
   .note { margin:0 0 16px; color:var(--muted); line-height:1.55; font-size:13px; }
   h3 { margin:18px 0 8px; font-size:12.5px; color:var(--muted); font-weight:600; }
   .slots { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .slot { display:flex; align-items:center; gap:8px; text-align:left; background:var(--panel2); border:1px dashed #38426c; border-radius:10px;
+  .slot { display:flex; align-items:center; gap:8px; text-align:left; background:var(--panel2); border:1.5px dashed #6272b5; border-radius:10px;
     padding:9px 10px; min-height:44px; cursor:default; color:var(--muted); font-size:13px; }
   .slot b { font-size:16px; color:var(--text); }
-  .slot .k { width:20px; height:20px; border-radius:6px; background:#2a3560; display:grid; place-items:center; font-size:11px; font-weight:700; color:var(--text); flex:none; }
-  .slot.filled { border-style:solid; border-color:var(--sel); cursor:pointer; }
+  .slot .k { width:22px; height:22px; border-radius:6px; background:#3a4a9a; display:grid; place-items:center; font-size:11px; font-weight:700; color:var(--text); flex:none; }
+  .slot.filled { border-style:solid; border-color:var(--sel); cursor:pointer; color:var(--text); }
   .slot.filled:hover { background:#2a2038; }
   .guide { color:var(--muted); line-height:1.55; font-size:13px; margin:10px 0 0; }
   .rel { margin:12px 0 8px; font-size:13px; color:var(--muted); line-height:1.5; }
@@ -77,20 +83,20 @@
   .card { border-radius:10px; padding:10px 12px; background:var(--panel2); border:1px solid var(--line); min-width:0; }
   .card .t { font-size:12px; color:var(--muted); font-weight:600; }
   .card .eq { font-size:12.5px; color:var(--muted); margin-top:4px; }
-  .card .v { font-size:24px; font-weight:700; margin-top:2px; overflow-wrap:anywhere; line-height:1.15; }
-  .card.join { border-color:#6d5a24; } .card.join .v { color:var(--join); }
-  .card.meet { border-color:#2b6a55; } .card.meet .v { color:var(--meet); }
-  .card.bad { border-color:#733d27; grid-column:1 / -1; } .card.bad .v { color:var(--bad); font-size:15px; }
+  .card .v { font-size:26px; font-weight:800; margin-top:2px; overflow-wrap:anywhere; line-height:1.15; }
+  .card.join { border-color:#b8933a; } .card.join .v { color:var(--join); }
+  .card.meet { border-color:#3fae86; } .card.meet .v { color:var(--meet); }
+  .card.bad { border-color:#c9693f; grid-column:1 / -1; } .card.bad .v { color:var(--bad); font-size:15px; }
   .card.bad p { margin:6px 0 0; font-size:12.5px; color:var(--muted); line-height:1.5; }
   .chips { display:flex; flex-wrap:wrap; gap:6px; }
-  .chip { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-size:13px; font-weight:600; cursor:pointer; }
-  .chip:hover { border-color:#5563a0; }
+  .chip { background:var(--panel2); border:1.5px solid #4a5a96; border-radius:9px; padding:6px 11px; font-size:14px; font-weight:700; cursor:pointer; color:var(--text); }
+  .chip:hover { border-color:#8fa2ff; }
   .chip.sel { background:var(--sel); color:#1a0b10; border-color:var(--sel); }
   .chip.join { background:var(--join); color:#201700; border-color:var(--join); }
   .chip.meet { background:var(--meet); color:#04241a; border-color:var(--meet); }
   .chip.up { border-color:var(--up); color:var(--up); } .chip.down { border-color:var(--down); color:var(--down); }
-  .chip.dim { opacity:.4; }
-  .key { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:18px; color:var(--muted); font-size:12px; }
+  .chip.dim { opacity:.55; }
+  .key { display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:18px; color:var(--muted); font-size:12.5px; }
   .key i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:baseline; }
  
   /* ---------- intro ---------- */
@@ -120,29 +126,46 @@
   .ring.r3 { inset:-58% -40%; border:1px dotted rgba(120,230,200,.3); animation-duration:30s; }
   @keyframes spin { to { transform:rotate(360deg); } }
   #intro.go .ring { opacity:0; }
-  .eyebrow { background:linear-gradient(90deg,#8b95b6,#fff,#8b95b6) 0 0/200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:sheen2 3s linear infinite, none; }
+  .eyebrow { background:linear-gradient(90deg,#bcc6e6,#fff,#bcc6e6) 0 0/200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:sheen2 3s linear infinite, none; }
   @keyframes sheen2 { to { background-position:-200% 0; } }
-  #tagline { min-height:1.6em; margin-top:14px; font-size:15px; letter-spacing:.12em; color:#aab6e6; transition:opacity .5s; }
+  #tagline { min-height:1.6em; margin-top:14px; font-size:15px; letter-spacing:.12em; color:#d4dcff; text-align:center; padding:0 16px; transition:opacity .5s; }
   #tagline::after { content:"\25AE"; margin-left:3px; color:#ff8fd0; animation:blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity:0; } }
   #tagline.go { opacity:0; }
-  #soundBtn { position:absolute; left:18px; bottom:16px; background:transparent; border:1px solid var(--line); color:var(--muted);
+  #soundBtn { position:absolute; left:18px; bottom:16px; background:rgba(20,27,47,.7); border:1px solid #4a5a96; color:var(--text);
     border-radius:8px; padding:6px 12px; font-size:12.5px; cursor:pointer; }
   #soundBtn:hover { color:var(--text); border-color:#4a5688; }
-  #skipIntro { position:absolute; right:18px; bottom:16px; background:transparent; border:1px solid var(--line); color:var(--muted);
+  #skipIntro { position:absolute; right:18px; bottom:16px; background:rgba(20,27,47,.7); border:1px solid #4a5a96; color:var(--text);
     border-radius:8px; padding:6px 12px; font-size:12.5px; cursor:pointer; }
   #skipIntro:hover { color:var(--text); border-color:#4a5688; }
  
   /* ---------- mobile ---------- */
   @media (max-width:880px) {
-    #app { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) minmax(0,44vh); }
+    html, body { font-size:15px; }
+    #app { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) minmax(0,42vh); padding-top:env(safe-area-inset-top,0px); }
+    @supports (height:100dvh) { #app { grid-template-rows:auto minmax(0,1fr) minmax(0,42dvh); } }
     #rail { border-right:0; border-bottom:1px solid var(--line); flex-direction:row; align-items:center; }
     #rail header { display:none; }
-    #list { flex-direction:row; overflow-x:auto; overflow-y:hidden; padding:8px; gap:6px; }
+    #list { flex-direction:row; overflow-x:auto; overflow-y:hidden; padding:8px 10px; gap:8px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+    #list::-webkit-scrollbar { display:none; }
     .grp { display:none; }
-    .ex { width:auto; white-space:nowrap; border-color:var(--line); }
-    #info { border-left:0; border-top:1px solid var(--line); }
+    .ex { width:auto; white-space:nowrap; min-height:44px; padding:8px 14px; font-size:14.5px; font-weight:600; background:var(--panel2); border:1.5px solid #4a5a96; border-radius:999px; }
+    .ex .dot { width:10px; height:10px; }
+    #info { border-left:0; border-top:1px solid #4a5a96; padding:14px 14px calc(18px + env(safe-area-inset-bottom,0px)); -webkit-overflow-scrolling:touch; }
+    #info h2 { font-size:19px; }
+    .note, .guide { font-size:14px; }
+    .rel { font-size:14px; }
+    .slot { min-height:50px; font-size:14px; }
+    .slot b { font-size:18px; }
+    .chip { min-height:40px; padding:8px 13px; font-size:15px; }
+    h3 { font-size:13px; }
     #hint { display:none; }
+    .lab { font-size:16px; padding:3px 10px; }
+    #toolbar { bottom:10px; max-width:calc(100% - 16px); overflow-x:auto; scrollbar-width:none; gap:2px; }
+    #toolbar::-webkit-scrollbar { display:none; }
+    #toolbar button { min-height:42px; padding:8px 12px; font-size:14px; }
+    #soundBtn, #skipIntro { min-height:42px; padding:8px 16px; font-size:14px; bottom:calc(16px + env(safe-area-inset-bottom,0px)); }
+    #tagline { font-size:14px; letter-spacing:.06em; }
   }
 </style>
 </head>
@@ -166,6 +189,8 @@
       <span class="sep"></span>
       <button id="spin" aria-pressed="true">Auto-rotate</button>
       <button id="clear">Clear</button>
+      <span class="sep"></span>
+      <button id="sfx" aria-pressed="true" aria-label="Toggle click sound">Sound</button>
     </div>
   </main>
  
@@ -208,6 +233,44 @@
    spec = { name, group, note, joinName, meetName, labels[], covers[[i,j],...], pos? }
    covers are Hasse edges (i is covered by j); the order is their reflexive-transitive closure. */
  
+
+/* ================= Click sound =================
+   Soft, short "pop" built from two sine/triangle partials. Pitch follows a pentatonic scale, so tapping
+   higher nodes in the lattice sounds higher. One shared AudioContext; unlocked on the first touch. */
+const SFX = (() => {
+  let ctx = null, on = true;
+  const SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];   // C5 D5 E5 G5 A5 C6
+  function get() {
+    if (!on) return null;
+    try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === "suspended") ctx.resume(); return ctx; }
+    catch (e) { return null; }
+  }
+  function tap(f, delay, vol) {
+    const a = get(); if (!a) return;
+    const t = a.currentTime + (delay || 0), v = (vol === undefined ? 1 : vol);
+    const o1 = a.createOscillator(), o2 = a.createOscillator(), g = a.createGain(), g2 = a.createGain(), lp = a.createBiquadFilter();
+    o1.type = "sine"; o1.frequency.setValueAtTime(f * 1.1, t); o1.frequency.exponentialRampToValueAtTime(f, t + 0.04);
+    o2.type = "triangle"; o2.frequency.setValueAtTime(f * 2, t); g2.gain.value = 0.22;
+    lp.type = "lowpass"; lp.frequency.value = 3400;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.085 * v, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.17);
+    o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(lp); lp.connect(a.destination);
+    o1.start(t); o2.start(t); o1.stop(t + 0.2); o2.stop(t + 0.2);
+  }
+  function set(v) {
+    on = v;
+    const b = document.getElementById("sfx"), s = document.getElementById("soundBtn");
+    if (b) b.setAttribute("aria-pressed", String(on));
+    if (s) s.textContent = "Sound: " + (on ? "on" : "off");
+  }
+  return { get, tap, set, scale: r => SCALE[Math.min(Math.max(r, 0), SCALE.length - 1)], get on() { return on; } };
+})();
+document.addEventListener("pointerdown", () => SFX.get(), { passive: true });
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest("button");
+  if (!b || b.matches(".chip, .slot, #startBtn")) return;      // those play their own note
+  SFX.tap(b.id === "sfx" || b.id === "soundBtn" ? 784 : 660);
+});
+
 function productSpec(name, group, note, kind, max, names, jn, mn) {
   const k = max.length, elems = [];
   (function rec(i, cur) {
@@ -325,18 +388,19 @@ Object.values(SPECS).forEach(s => { s.A = analyze(s); s.tag = !s.A.isLattice ? "
 const stage = document.getElementById("stage");
 const labelsEl = document.getElementById("labels");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2.5));
 stage.insertBefore(renderer.domElement, labelsEl);
 const canvas = renderer.domElement;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
-scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-const keyLight = new THREE.DirectionalLight(0xffffff, 0.9); keyLight.position.set(5, 8, 6); scene.add(keyLight);
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.0); keyLight.position.set(5, 8, 6); scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0x9db4ff, 0.45); fillLight.position.set(-6, -3, -5); scene.add(fillLight);
 const world = new THREE.Group(); world.rotation.set(0.35, 0.6, 0); scene.add(world);
  
 const C = { sel: new THREE.Color("#ff6b8b"), join: new THREE.Color("#ffc857"), meet: new THREE.Color("#5be3a8"),
             up: new THREE.Color("#c08bff"), down: new THREE.Color("#5fb6ff"),
-            edge: new THREE.Color("#4d5b95"), edgeDim: new THREE.Color("#222a47") };
+            edge: new THREE.Color("#8fa0ee"), edgeDim: new THREE.Color("#2a3358") };
 const VIEWS = { iso: { x: 0.35, y: 0.6 }, front: { x: 0, y: 0 }, top: { x: 1.35, y: 0 } };
  
 let G = null, selected = [], hover = -1, overlay = [], tween = null, autoSpin = true;
@@ -345,7 +409,7 @@ let camDist = 10, W = 1, H = 1;
 function fitDist() {
   if (!G) return;
   const vf = camera.fov * Math.PI / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * camera.aspect);
-  camDist = (G.R + 0.9) / Math.sin(Math.min(vf, hf) / 2);
+  camDist = (G.R + (innerWidth <= 880 ? 1.4 : 1.0)) / Math.sin(Math.min(vf, hf) / 2);
 }
 function resize() {
   W = stage.clientWidth; H = stage.clientHeight;
@@ -382,23 +446,19 @@ function build(key) {
   pts.forEach(p => p.sub(ctr));
   const R = Math.max(...pts.map(p => p.length()), 1);
  
-  const ev = [], ec = [];
-  spec.covers.forEach(([a, b]) => { ev.push(pts[a].x, pts[a].y, pts[a].z, pts[b].x, pts[b].y, pts[b].z); ec.push(0,0,0,0,0,0); });
-  const eg = new THREE.BufferGeometry();
-  eg.setAttribute("position", new THREE.Float32BufferAttribute(ev, 3));
-  eg.setAttribute("color", new THREE.Float32BufferAttribute(ec, 3));
-  const edges = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ vertexColors: true }));
-  world.add(edges);
+  const phone = innerWidth <= 880;
+  const edges = new THREE.Group(); world.add(edges);
+  spec.covers.forEach(([a, b]) => { const m = bar(pts[a], pts[b], phone ? 0.05 : 0.038, C.edge); edges.add(m); });
  
   const maxRank = Math.max(A.height, 1);
   const nodes = spec.labels.map((label, i) => {
-    const base = new THREE.Color().setHSL(0.62 - 0.62 * (A.rank[i] / maxRank), 0.65, 0.58);
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.26, 24, 18),
-      new THREE.MeshStandardMaterial({ color: base, roughness: 0.4, metalness: 0.15, transparent: true }));
+    const base = new THREE.Color().setHSL(0.62 - 0.62 * (A.rank[i] / maxRank), 0.8, 0.6);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(phone ? 0.32 : 0.28, 32, 24),
+      new THREE.MeshStandardMaterial({ color: base, roughness: 0.35, metalness: 0.1, transparent: true }));
     mesh.position.copy(pts[i]);
     world.add(mesh);
     // larger invisible target so nodes are easy to hover and click
-    const hit = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+    const hit = new THREE.Mesh(new THREE.SphereGeometry(phone ? 0.65 : 0.52, 8, 6), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
     hit.position.copy(pts[i]); hit.userData.idx = i; world.add(hit);
     const lab = document.createElement("div"); lab.className = "lab"; lab.textContent = label; labelsEl.appendChild(lab);
     const chip = document.createElement("button"); chip.className = "chip"; chip.textContent = label;
@@ -426,10 +486,16 @@ function build(key) {
 }
  
 /* ================= State -> visuals ================= */
+function bar(p, q, r, color) {
+  const d = new THREE.Vector3().subVectors(q, p), len = d.length();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8, 1), new THREE.MeshBasicMaterial({ color: color.clone ? color.clone() : new THREE.Color(color) }));
+  m.position.copy(p).addScaledVector(d, 0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+  return m;
+}
 function addLink(a, b, color) {
-  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([G.nodes[a].pos, G.nodes[b].pos]),
-    new THREE.LineDashedMaterial({ color, dashSize: 0.18, gapSize: 0.1 }));
-  l.computeLineDistances(); world.add(l); overlay.push(l);
+  const l = bar(G.nodes[a].pos, G.nodes[b].pos, innerWidth <= 880 ? 0.075 : 0.06, new THREE.Color(color));
+  world.add(l); overlay.push(l);
 }
 const L = i => G.nodes[i].label;
 const names = a => a.map(L).join(", ");
@@ -465,26 +531,24 @@ function refresh() {
  
   nodes.forEach((nd, i) => {
     const s = st[i], m = nd.mesh.material;
-    let col = nd.base, em = 0, sc = 1, op = 1;
+    let col = nd.base, em = 0.16, sc = 1, op = 1;
     if (s === "sel") { col = C.sel; em = .35; sc = 1.4; }
     else if (s === "join") { col = C.join; em = .35; sc = 1.35; }
     else if (s === "meet") { col = C.meet; em = .35; sc = 1.35; }
     else if (s === "hov") { em = .3; sc = 1.35; }
     else if (s === "up") { col = C.up; em = .2; sc = 1.15; }
     else if (s === "down") { col = C.down; em = .2; sc = 1.15; }
-    else if (s === "dim") op = .22;
+    else if (s === "dim") op = .3;
     m.color.copy(col); m.emissive.copy(col).multiplyScalar(em); m.opacity = op; nd.mesh.scale.setScalar(sc);
     nd.lab.className = "lab" + (s && s !== "dim" ? " " + s : ""); nd.dim = s === "dim";
     nd.chip.className = "chip" + (s ? " " + s : "");
   });
  
-  const colAttr = G.edges.geometry.attributes.color;
   spec.covers.forEach(([a, b], k) => {
     let c = C.edge;
     if (h >= 0) c = le[h][a] ? C.up : le[b][h] ? C.down : C.edgeDim;
-    for (let t = 0; t < 2; t++) colAttr.setXYZ(k * 2 + t, c.r, c.g, c.b);
+    G.edges.children[k].material.color.copy(c);
   });
-  colAttr.needsUpdate = true;
  
   // slots
   const slot = (k, i) => i === undefined
@@ -496,10 +560,18 @@ function refresh() {
 }
  
 function toggle(i) {
-  if (selected.includes(i)) selected = selected.filter(x => x !== i);
+  const was = selected.includes(i);
+  if (was) selected = selected.filter(x => x !== i);
   else if (selected.length >= 2) selected = [i];
   else selected.push(i);
   refresh();
+  const f = SFX.scale(G.A.rank[i]);
+  if (was) SFX.tap(f * 0.75, 0, 0.8);
+  else if (selected.length === 2) {                 // second pick: add a soft answering note
+    SFX.tap(f);
+    const b = G.A.bounds(selected[0], selected[1]);
+    if (b.J >= 0 && b.M >= 0) SFX.tap(f * 1.5, 0.09, 0.8); else SFX.tap(f * 0.5, 0.09, 0.9);
+  } else SFX.tap(f);
 }
  
 function updateLabels() {
@@ -512,7 +584,7 @@ function updateLabels() {
     const x = (v.x * 0.5 + 0.5) * W, y = (-v.y * 0.5 + 0.5) * H - 20;
     n.lab.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`;
     n.lab.style.zIndex = String(Math.round(1000 - ds[i] * 10));
-    n.lab.style.opacity = String((1 - 0.5 * (ds[i] - dmin) / span) * (n.dim ? 0.3 : 1));
+    n.lab.style.opacity = String((1 - 0.22 * (ds[i] - dmin) / span) * (n.dim ? 0.35 : 1));
   });
 }
  
@@ -566,6 +638,7 @@ document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click"
 function setSpin(on) { autoSpin = on; $("spin").setAttribute("aria-pressed", String(on)); }
 $("spin").addEventListener("click", () => setSpin(!autoSpin));
 $("clear").addEventListener("click", () => { selected = []; refresh(); });
+$("sfx").addEventListener("click", () => SFX.set(!SFX.on));
 addEventListener("keydown", e => {
   if (e.key === "Escape") { selected = []; refresh(); }
   else if (e.key === "r" || e.key === "R") setSpin(!autoSpin);
@@ -656,12 +729,12 @@ animate();
   let t0 = performance.now(), last = t0, clickT = null, done = false, built = false;
   let mxs = 0, mys = 0, tx = 0, ty = 0, lastAng = 0, lastTilt = 0.2, angC = 0, tiltC = 0, angT = 0;
   const sparks = [];
-  let vt = 0, sp = 1, spT = 1, px = -999, py = -999, pxs = -999, pys = -999, soundOn = true, actx = null;
+  let vt = 0, sp = 1, spT = 1, px = -999, py = -999, pxs = -999, pys = -999;
   const ripples = [];
   const stars = Array.from({ length: 360 }, () => ({ x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, z: Math.random(), h: 190 + Math.random() * 140 }));
 
   // ---- tiny synth sounds (quiet, toggleable) ----
-  function ac() { if (!soundOn) return null; try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); return actx; } catch (e) { return null; } }
+  function ac() { return SFX.get(); }
   function blip(f) { const a = ac(); if (!a) return; const o = a.createOscillator(), g = a.createGain(), t = a.currentTime;
     o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 2, t + .18);
     g.gain.setValueAtTime(.06, t); g.gain.exponentialRampToValueAtTime(.0001, t + .25); o.connect(g).connect(a.destination); o.start(); o.stop(t + .3); }
@@ -674,7 +747,7 @@ animate();
     [523.25, 659.25, 783.99, 1046.5].forEach((fr, k) => { const o2 = a.createOscillator(), g2 = a.createGain(), s0 = t + .4 + k * .35;
       o2.type = "triangle"; o2.frequency.value = fr; g2.gain.setValueAtTime(.0001, s0); g2.gain.exponentialRampToValueAtTime(.05, s0 + .03); g2.gain.exponentialRampToValueAtTime(.0001, s0 + .9);
       o2.connect(g2).connect(a.destination); o2.start(s0); o2.stop(s0 + 1); }); }
-  soundBtn.addEventListener("click", () => { soundOn = !soundOn; soundBtn.textContent = "Sound: " + (soundOn ? "on" : "off"); if (soundOn) blip(520); });
+  soundBtn.addEventListener("click", () => SFX.set(!SFX.on));
 
   // ---- typewriter tagline ----
   const LINES = ["Where order meets chaos.", "Every pair has a join. Every pair has a meet.", "12 names. 1 lattice. Zero chill.", "Move your mouse. Click anywhere. Break things.", "Press Enter to launch."];
@@ -781,7 +854,7 @@ animate();
           ctx.strokeStyle = `rgba(${c},${0.7 * (1 - r / 1.4)})`; ctx.lineWidth = 3; ctx.stroke(); }
       });
     }
-    for (let k = ripples.length - 1; k >= 0; k--) { const r = ripples[k], a = (now - r.t) / 1000; if (a > 1.2) { ripples.splice(k, 1); continue; }
+    for (let k = ripples.length - 1; k >= 0; k--) { const r = ripples[k], a = Math.max(0, (now - r.t) / 1000); if (a > 1.2) { ripples.splice(k, 1); continue; }
       ctx.beginPath(); ctx.arc(r.x, r.y, a * 260, 0, 6.283); ctx.strokeStyle = `hsla(${r.h},90%,70%,${0.8 * (1 - a / 1.2)})`; ctx.lineWidth = 1 + 3 * (1 - a / 1.2); ctx.stroke(); }
     ctx.globalCompositeOperation = "lighter";
     for (let k = sparks.length - 1; k >= 0; k--) {
@@ -818,12 +891,13 @@ animate();
     }
  
     // names / nodes, far to near
-    items.sort((a, b) => a.q.z - b.q.z);
+    items.sort((a, b) => ((a.i === 0) - (b.i === 0)) || a.q.z - b.q.z);   // Aryan always drawn on top
     ctx.globalCompositeOperation = "source-over";
-    const FSF = Math.max(20, Math.min(30, U * 0.2)), FSL = Math.max(11, Math.min(17, U * 0.12));
+    const FSF = Math.max(20, Math.min(30, U * 0.2)), FSL = Math.max(12.5, Math.min(18, U * 0.13));
     items.forEach(it => {
-      const { i, u, q } = it, star = i === 0, h = star ? 45 : hue(i), zs = Math.pow(zoom, 0.8);
-      const depth = 0.6 + 0.4 * clamp((q.s - 0.83) / 0.42);
+      const { i, u, q } = it, star = i === 0, h = star ? 255 : hue(i), zs = Math.pow(zoom, 0.8);
+      const depth = star ? 1 : 0.6 + 0.4 * clamp((q.s - 0.83) / 0.42);
+      if (star) q.s = Math.max(q.s, 1.05);
       const gl = tt >= 0 ? clamp(1 - Math.abs(tt - (2.2 + A.rank[i] * 0.28)) / 0.35) : 0;
       const fs = (FSF + (FSL - FSF) * u) * q.s * zs * (star ? 1.22 : 1);
       ctx.font = `700 ${fs}px Figtree, "Segoe UI", sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -837,10 +911,11 @@ animate();
         ctx.strokeStyle = `rgba(255,255,255,${0.75 * u})`; ctx.lineWidth = 1.5; ctx.stroke();
       }
       ctx.shadowColor = `hsl(${h},90%,65%)`; ctx.shadowBlur = u < 1 ? 14 : 0;
-      const darkText = star && u > 0.5;
+      const darkText = false;
       if (!darkText) { ctx.lineJoin = "round"; ctx.lineWidth = fs * 0.2; ctx.strokeStyle = "rgba(8,10,20,.6)"; ctx.shadowBlur = 0; ctx.strokeText(NAMES[i], q.x, q.y + fs * 0.04); }
       ctx.shadowColor = `hsl(${h},90%,65%)`; ctx.shadowBlur = u < 1 ? 14 : 0;
-      ctx.fillStyle = darkText ? "#1a1200" : u > 0.5 ? "#fff" : `hsla(${h},85%,84%,${depth})`;
+      ctx.fillStyle = star && u <= 0.5 ? (() => { const hw = ctx.measureText(NAMES[i]).width / 2, g = ctx.createLinearGradient(q.x - hw, 0, q.x + hw, 0);
+        g.addColorStop(0, "#5fb6ff"); g.addColorStop(1, "#c08bff"); return g; })() : u > 0.5 ? "#fff" : `hsla(${h},85%,84%,${depth})`;
       ctx.fillText(NAMES[i], q.x, q.y + fs * 0.04); ctx.shadowBlur = 0;
     });
  
